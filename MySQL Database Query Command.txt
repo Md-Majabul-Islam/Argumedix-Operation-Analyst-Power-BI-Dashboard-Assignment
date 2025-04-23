@@ -1,0 +1,94 @@
+#Task 1: Data Analysis Using Excel/Google Sheets
+#================================================
+
+#Goal 1: Finding the associated provider for billing data using appointment data.
+
+#Q1:
+ALTER TABLE billing_data ADD COLUMN provider_full_name VARCHAR(255);
+
+#Q2:
+(UPDATE billing_data JOIN scheduling_data
+ON billing_data.`Patient ID` = scheduling_data.`Patient ID`
+AND billing_data.DOS = scheduling_data.`Appointment Start Date`
+SET billing_data.provider_full_name = CONCAT(scheduling_data.`Staff First Name`,
+' ', scheduling_data.`Staff Last Name`)
+WHERE billing_data.provider_full_name ASC);
+
+#Q3:
+SELECT provider_full_name FROM billing_data;
+
+#Q4:
+SELECT * FROM billing_data WHERE provider_full_name IS NULL;
+
+
+#Goal 2: Calculating Total Amount Collected Per Provider
+
+#Q1:
+SELECT provider_full_name, SUM(Amount) AS total_amount_collected FROM billing_data
+WHERE `Payment Method` IN ('Cash', 'Check', 'EFT', 'Credit Card', 'Visa', 'Mastercard', 'AMEX')
+GROUP BY provider_full_name
+ORDER BY total_amount_collected DESC;
+
+#Goal 3: Counting the distinct encounters in the billing data.
+
+#Q1:
+SELECT COUNT(DISTINCT
+    CASE
+        WHEN provider_full_name IS NOT NULL THEN CONCAT(`Patient ID`, '_', `DOS`, '_', provider_full_name)
+        ELSE CONCAT(`Patient ID`, '_', `DOS`)
+    END
+) AS total_unique_encounters FROM billing_data;
+
+
+#Task 2: RCM Data Analysis Assessment
+#=====================================
+#Goal 1: Calculating total collections using claim level dataset provided in payment_data
+
+#Q1:
+SELECT SUM(Amt) AS total_amount_collected
+FROM payment_data;
+
+#Q2:
+SELECT `Source of Payment`, SUM(Amt) AS amount_collected
+FROM payment_data
+GROUP BY `Source of Payment`;
+
+#Q3:
+SELECT AVG(total_collected) AS average_amount_per_encounter
+FROM (
+    SELECT `Claim ID`, SUM(Amt) AS total_collected
+    FROM payment_data
+    GROUP BY `Claim ID`
+) AS encounter_totals;
+
+
+#Goal-2
+#Q1:
+SELECT `Insurance Type`, `Insurance Name`, AVG(total_collected) AS avg_collected_per_encounter
+FROM (
+    SELECT 'Primary' AS `Insurance Type`, `Primary Insurance` AS `Insurance Name`, `Claim ID`, SUM(Amt) AS total_collected
+    FROM payment_data
+    GROUP BY `Primary Insurance`, `Claim ID`
+
+    UNION ALL
+
+    SELECT 'Secondary' AS `Insurance Type`, `Secondary Insurance` AS `Insurance Name`, `Claim ID`, SUM(Amt) AS total_collected
+    FROM payment_data
+    GROUP BY `Secondary Insurance`, `Claim ID`
+) AS insurance_totals
+GROUP BY `Insurance Type`, `Insurance Name`
+ORDER BY avg_collected_per_encounter DESC
+LIMIT 1;
+
+#Q2:
+SELECT `Insurance Name`, SUM(Amt) AS total_collected
+FROM (
+    SELECT `Primary Insurance` AS `Insurance Name`, Amt FROM payment_data
+    UNION ALL
+    SELECT `Secondary Insurance` AS `Insurance Name`, Amt FROM payment_data
+) AS insurance_totals
+WHERE `Insurance Name` IN ('Harrison Health Co.', 'PrimeCare Solutions', 'National Coverage Group')
+GROUP BY `Insurance Name`;
+
+
+
